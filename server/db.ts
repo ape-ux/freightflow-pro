@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, companies, carriers, quotes, dispatches, drivers } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,58 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Company queries
+export async function getCompanyById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAllCompanies() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(companies);
+}
+
+// Carrier queries
+export async function getCarrierById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(carriers).where(eq(carriers.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCarriersByCompany(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(carriers).where(eq(carriers.companyId, companyId));
+}
+
+// Quote queries
+export async function getQuoteById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(quotes).where(eq(quotes.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getQuotesByCustomer(customerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(quotes).where(eq(quotes.customerId, customerId));
+}
+
+// Dispatch queries
+export async function getDispatchById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(dispatches).where(eq(dispatches.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getDispatchesByCarrier(carrierId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(dispatches).where(eq(dispatches.carrierId, carrierId));
+}
