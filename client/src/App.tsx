@@ -3,16 +3,55 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import DashboardLayout from "./components/DashboardLayout";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Quotes from "./pages/Quotes";
+import Dispatches from "./pages/Dispatches";
+import Carriers from "./pages/Carriers";
+import Customers from "./pages/Customers";
+import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"}>
+        <DashboardLayout>
+          <Dashboard />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/quotes"}>
+        <DashboardLayout>
+          <Quotes />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/dispatches"}>
+        <DashboardLayout>
+          <Dispatches />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/carriers"}>
+        <DashboardLayout>
+          <Carriers />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/customers"}>
+        <DashboardLayout>
+          <Customers />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/analytics"}>
+        <DashboardLayout>
+          <Analytics />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/settings"}>
+        <DashboardLayout>
+          <Settings />
+        </DashboardLayout>
+      </Route>
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );

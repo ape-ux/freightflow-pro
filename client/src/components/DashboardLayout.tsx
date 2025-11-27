@@ -21,15 +21,49 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_LOGO, APP_TITLE, getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  PanelLeft,
+  FileText,
+  Truck,
+  Users,
+  Building,
+  TrendingUp,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
+import { mockQuotes, mockDispatches } from "@/mocks/data";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+interface MenuItem {
+  icon: React.ElementType;
+  label: string;
+  path: string;
+  badge?: number;
+}
+
+const menuItems: MenuItem[] = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  {
+    icon: FileText,
+    label: "Quotes",
+    path: "/quotes",
+    badge: mockQuotes.filter(q => q.status === 'pending').length,
+  },
+  {
+    icon: Truck,
+    label: "Dispatches",
+    path: "/dispatches",
+    badge: mockDispatches.filter(d => !['delivered', 'completed', 'cancelled'].includes(d.status)).length,
+  },
+  { icon: Users, label: "Carriers", path: "/carriers" },
+  { icon: Building, label: "Customers", path: "/customers" },
+  { icon: TrendingUp, label: "Analytics", path: "/analytics" },
+  { icon: SettingsIcon, label: "Settings", path: "/settings" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -222,7 +256,15 @@ function DashboardLayoutContent({
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                       />
-                      <span>{item.label}</span>
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge && item.badge > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 px-1 text-xs group-data-[collapsible=icon]:hidden"
+                        >
+                          {item.badge}
+                        </Badge>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
