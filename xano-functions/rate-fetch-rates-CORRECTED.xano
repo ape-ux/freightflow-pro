@@ -1,0 +1,407 @@
+"rate/fetch-rates" verb=POST {
+  auth = "App | Users"
+
+  input {
+    json data
+  }
+
+  stack {
+    // ============================================
+    // STEP 1: INPUT VALIDATION
+    // ============================================
+
+    var $data {
+      value = $input.data
+    }
+
+    // Validate required zip codes
+    precondition (($input.data.DestinationZipCode|is_empty) == false && ($input.data.OriginZipCode|is_empty) == false) {
+      error_type = "bad_request"
+      error = "Please check your zip codes before proceeding."
+      payload = {
+        message: "Both OriginZipCode and DestinationZipCode are required"
+      }
+    }
+
+    // ============================================
+    // STEP 2: LOCATION VALIDATION & GEOCODING
+    // ============================================
+
+    // Perform address autocomplete for both origin and destination
+    function.run "radar/address/autocomplete" {
+      input = {
+        query          : $data.OriginZipCode
+        near_me        : ""
+        US_only        : ""
+        zip_search_only: true
+      }
+    } as $origin_zip
+
+    function.run "radar/address/autocomplete" {
+      input = {
+        query          : $data.DestinationZipCode
+        near_me        : ""
+        US_only        : ""
+        zip_search_only: true
+      }
+    } as $destination_zip
+
+    // Store backup location data
+    var $backup_location_data {
+      value = {}
+        |set:"origin":$origin_zip
+        |set:"destination":$destination_zip
+    }
+
+    // Update data with country codes if not provided
+    conditional {
+      if (($data.OriginCountry|is_empty) == true || ($data.DestinationCountry|is_empty) == true) {
+        var.update $data {
+          value = $data
+            |set:"OriginCountry":$origin_zip.country
+            |set:"DestinationCountry":$destination_zip.country
+        }
+      }
+    }
+
+    // ============================================
+    // STEP 3: USER & CUSTOMER AUTHENTICATION
+    // ============================================
+
+    // Get authenticated user with customer relationship
+    db.get "App | Users" {
+      field_name = "id"
+      field_value = $auth.id
+      output = ["id", "email", "name", "app_customers_id"]
+      addon = [
+        {
+          name  : "Single Customer"
+          output: ["id", "eid", "name", "description", "app_customers_id"]
+          input : {App_Customers_id: "app_customers_id"}
+          as    : "customer"
+        }
+      ]
+    } as $user
+
+    // Debug: Check user data
+    !debug.stop {
+      value = {
+        message: "User data retrieved",
+        user_id: $user.id,
+        user_email: $user.email,
+        app_customers_id: $user.app_customers_id,
+        has_customer: ($user.app_customers_id|is_empty) == false
+      }
+    }
+
+    // Validate user has customer association
+    precondition (($user.app_customers_id|is_empty) == false) {
+      error_type = "forbidden"
+      error = "User account is not associated with a customer. Please contact support."
+      payload = {
+        user_id: $auth.id,
+        user_email: $user.email,
+        message: "Missing app_customers_id association"
+      }
+    }
+
+    // ============================================
+    // STEP 4: RETRIEVE CUSTOMER API KEY
+    // ============================================
+
+    // Get customer API keys
+    db.get "Company | Customers | Keys" {
+      field_name = "app_customers_id"
+      field_value = $user.app_customers_id
+      output = ["id", "app_customers_id", "tai_api_key", "created_at"]
+    } as $customer_key
+
+    // Debug: Check customer key data
+    !debug.stop {
+      value = {
+        message: "Customer key lookup",
+        app_customers_id: $user.app_customers_id,
+        key_found: ($customer_key|is_empty) == false,
+        has_tai_api_key: ($customer_key.tai_api_key|is_empty) == false
+      }
+    }
+
+    // Validate customer API key exists
+    precondition (($customer_key|is_empty) == false && ($customer_key.tai_api_key|is_empty) == false) {
+      error_type = "not_found"
+      error = "Customer API key not found. Please configure your TAI API key in Settings."
+      payload = {
+        user_id: $auth.id,
+        app_customers_id: $user.app_customers_id,
+        message: "Missing tai_api_key in Company | Customers | Keys table"
+      }
+    }
+
+    // ============================================
+    // STEP 5: PROCESS ACCESSORIAL CODES
+    // ============================================
+
+    conditional {
+      if (($input.data.AccessorialCodes|is_empty) == false) {
+        // Map accessorial names to codes
+        db.query "Options | Accessorial" {
+          where = $input.data.AccessorialCodes in $db.options_accessorial.name
+          return = {type: "list"}
+        } as $accessorials
+
+        var.update $data {
+          value = $data
+            |set:"AccessorialCodes":$accessorials.code
+        }
+      }
+    }
+
+    // Debug: Check processed data before API call
+    !debug.stop {
+      value = {
+        message: "Final data before API call",
+        data: $data,
+        api_key_present: ($customer_key.tai_api_key|is_empty) == false
+      }
+    }
+
+    // ============================================
+    // STEP 6: VERIFY TAI AUTHENTICATION
+    // ============================================
+
+    // Verify authentication with TAI API
+    api.request {
+      url = "https://atl.taicloud.net/publicapi/shipping/verifyauthentication/TOKEN"
+        |replace:"TOKEN":$customer_key.tai_api_key
+      method = "GET"
+      headers = []
+        |push:"Accept: application/json"
+        |push:("x-api-key: TOKEN"
+          |replace:"TOKEN":$customer_key.tai_api_key
+        )
+      timeout = 30
+    } as $api_verification
+
+    // Debug: Check authentication response
+    !debug.stop {
+      value = {
+        message: "TAI API verification",
+        status: $api_verification.response.status,
+        result: $api_verification.response.result,
+        is_verified: $api_verification.response.result == "Authentication Verified"
+      }
+    }
+
+    // Validate API authentication
+    precondition ($api_verification.response.result == "Authentication Verified" && $api_verification.response.status == 200) {
+      error_type = "unauthorized"
+      error = "TAI API Authentication Failed. Please verify your API key."
+      payload = {
+        status: $api_verification.response.status,
+        result: $api_verification.response.result,
+        message: "Invalid or expired TAI API key"
+      }
+    }
+
+    // ============================================
+    // STEP 7: GET VALID ACCESSORIAL CODES
+    // ============================================
+
+    // Get list of valid accessorial codes from TAI API
+    api.request {
+      url = "https://atl.taicloud.net/publicapi/shipping/accessorialList/TOKEN"
+        |replace:"TOKEN":$customer_key.tai_api_key
+      method = "GET"
+      headers = []
+        |push:"Accept: application/json"
+        |push:("x-api-key: TOKEN"
+          |replace:"TOKEN":$customer_key.tai_api_key
+        )
+      timeout = 30
+    } as $accessorial_list
+
+    // Filter accessorial codes to only valid ones
+    var $validated_accessorial_codes {
+      value = $accessorial_list.response.result.code
+        |intersect:$data.AccessorialCodes
+    }
+
+    // ============================================
+    // STEP 8: REQUEST RATE QUOTE FROM TAI API
+    // ============================================
+
+    // Make rate quote request
+    api.request {
+      url = "https://atl.taicloud.net/publicapi/shipping/getRateQuote"
+      method = "PUT"
+      params = {}
+        |set:"AuthenticationKey":$customer_key.tai_api_key
+        |set:"OriginZipCode":$data.OriginZipCode
+        |set:"OriginCountry":$data.OriginCountry
+        |set:"DestinationZipCode":$data.DestinationZipCode
+        |set:"DestinationCountry":$data.DestinationCountry
+        |set:"Commodities":$data.Commodities
+        |set:"WeightUnits":$data.WeightUnits
+        |set:"DimensionUnits":$data.DimensionUnits
+        |set:"AccessorialCodes":$validated_accessorial_codes
+        |set:"LegacySupport":$data.LegacySupport
+        |set:"CustomerReferenceNumber":$data.CustomerReferenceNumber
+      headers = []
+        |push:"Content-Type: application/json"
+        |push:"Accept: application/json"
+      timeout = 90
+    } as $quotes_response
+
+    // Extract quotes from response
+    var $raw_quotes {
+      value = $quotes_response.response.result
+    }
+
+    // Debug: Check quotes response
+    !debug.stop {
+      value = {
+        message: "TAI API quotes response",
+        status: $quotes_response.response.status,
+        quote_count: ($raw_quotes|length),
+        quotes: $raw_quotes
+      }
+    }
+
+    // ============================================
+    // STEP 9: FILTER QUOTES BY ACTIVE CARRIERS
+    // ============================================
+
+    // Get list of active carriers
+    db.query "Company | Carriers_v2" {
+      where = `$db.company_carriers_v2.is_active`
+      return = {type: "list"}
+    } as $carriers
+
+    var $active_carrier_names {
+      value = $carriers.name
+    }
+
+    // Filter quotes to only include active carriers
+    var $filtered_quotes {
+      value = []
+    }
+
+    foreach ($raw_quotes) {
+      each as $quote {
+        var $carrier_name {
+          value = $quote
+            |get:"carrierName":null
+            |safe_array
+            |intersect:$active_carrier_names
+        }
+
+        conditional {
+          if (($carrier_name|is_empty) == false) {
+            array.push $filtered_quotes {
+              value = $quote
+            }
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // STEP 10: PREPARE SHIPMENT OBJECT
+    // ============================================
+
+    function.run "prepare shipment object" {
+      input = {
+        user_input          : $data
+        backup_location_data: $backup_location_data
+      }
+    } as $shipment_data
+
+    // ============================================
+    // STEP 11: GENERATE QUOTE ID
+    // ============================================
+
+    function.run eid {
+      input = {number: 1}
+    } as $quote_eid
+
+    // ============================================
+    // STEP 12: SAVE QUOTE TO DATABASE OR RETURN ERROR
+    // ============================================
+
+    conditional {
+      if (($filtered_quotes|is_empty) == false) {
+        // SUCCESS: Save generated quotes to database
+        db.add "Rate Quotes | User Generated" {
+          data = {
+            created_at     : "now"
+            modified_at    : now
+            eid            : $quote_eid
+            app_users_id   : $auth.id
+            app_customers_id: $user.app_customers_id
+            quoted_on      : now
+            expires_at     : now|transform_timestamp:"+1 day":"UTC"
+            is_expired     : false
+            quotes         : $filtered_quotes
+            map_embed      : """
+            <iframe
+              width="450"
+              height="250"
+              frameborder="0" style="border:0"
+              referrerpolicy="no-referrer-when-downgrade"
+              src="https://www.google.com/maps/embed/v1/MAP_MODE?key=YOUR_API_KEY&PARAMETERS"
+              allowfullscreen>
+            </iframe>
+            """|replace:"MAP_MODE":"directions"|replace:"YOUR_API_KEY":$env.Google_maps_apiKey|replace:"PARAMETERS":("origin=ORIGIN_ZIP"|replace:"ORIGIN_ZIP":$data.OriginZipCode|concat:("destination=DESTINATION_ZIP"|replace:"DESTINATION_ZIP":$data.DestinationZipCode):"&")
+            user_input     : $data
+            origin_zip     : $data.OriginZipCode
+            destination_zip: $data.DestinationZipCode
+          }
+        } as $generated_quotes
+
+        // Return success response
+        function.run "common/display-result" {
+          input = {
+            status       : "success"
+            data         : {}
+              |set:"quote_id":$generated_quotes.eid
+              |set:"quotes":$generated_quotes.quotes
+              |set:"user_input":$generated_quotes.user_input
+              |set:"map_embed":$generated_quotes.map_embed
+              |set:"shipment":$shipment_data
+            has_data     : true
+            alert_message: "Quotes generated successfully!"
+            show_alert   : true
+            log_result   : false
+            log_metadata : {}
+          }
+        } as $result
+      }
+
+      else {
+        // ERROR: No quotes available
+        function.run "common/display-result" {
+          input = {
+            status       : "error"
+            data         : {}
+              |set:"quote_id":$quote_eid
+              |set:"quotes":$filtered_quotes
+              |set:"shipment":$shipment_data
+              |set:"raw_quote_count":($raw_quotes|length)
+              |set:"active_carrier_count":($active_carrier_names|length)
+            has_data     : false
+            alert_message: "No quotes available from active carriers at this time."
+            show_alert   : true
+            log_result   : true
+            log_metadata : {
+              reason: "No matching active carriers",
+              raw_quotes: ($raw_quotes|length),
+              active_carriers: ($active_carrier_names|length)
+            }
+          }
+        } as $result
+      }
+    }
+  }
+
+  response = $result
+}
