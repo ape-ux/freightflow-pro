@@ -1,0 +1,136 @@
+{
+  "name": "stg_get_job_lot",
+  "description": "Obtains CFS cargo details using Job Lot identifier",
+  "type": "custom_function",
+  "tags": ["stg-usa", "job", "ocean-import", "cfs"],
+  "inputs": [
+    {
+      "name": "jobLotNumber",
+      "type": "text",
+      "description": "Job Lot Number to search",
+      "required": true,
+      "validators": [
+        {
+          "type": "not_empty",
+          "message": "Job Lot Number is required"
+        }
+      ]
+    },
+    {
+      "name": "custCode",
+      "type": "text",
+      "description": "Customer code (optional, uses default from env if not provided)",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "result",
+      "type": "object",
+      "description": "CFS Details"
+    },
+    {
+      "name": "success",
+      "type": "boolean"
+    },
+    {
+      "name": "error",
+      "type": "object",
+      "nullable": true
+    }
+  ],
+  "function_stack": [
+    {
+      "id": "build_endpoint",
+      "function": "text_concat",
+      "output": "endpoint",
+      "params": {
+        "items": [
+          "/joblot/",
+          { "var": "jobLotNumber" }
+        ]
+      }
+    },
+    {
+      "id": "get_default_cust_code",
+      "function": "get_environment_variable",
+      "output": "default_cust_code",
+      "params": {
+        "name": "STG_CUSTOMER_CODE"
+      }
+    },
+    {
+      "id": "resolve_cust_code",
+      "function": "coalesce",
+      "output": "resolved_cust_code",
+      "params": {
+        "values": [
+          { "var": "custCode" },
+          { "var": "default_cust_code" }
+        ]
+      }
+    },
+    {
+      "id": "build_query_params",
+      "function": "create_object",
+      "output": "query_params",
+      "params": {
+        "object": {
+          "custCode": { "var": "resolved_cust_code" }
+        }
+      }
+    },
+    {
+      "id": "call_stg_api",
+      "function": "custom_function",
+      "output": "api_result",
+      "params": {
+        "name": "stg_base_request",
+        "inputs": {
+          "endpoint": { "var": "endpoint" },
+          "method": "GET",
+          "query_params": { "var": "query_params" }
+        }
+      }
+    },
+    {
+      "id": "check_success",
+      "function": "conditional",
+      "output": "is_success",
+      "params": {
+        "if": { "var": "api_result.success" },
+        "then": true,
+        "else": false
+      }
+    },
+    {
+      "id": "handle_error",
+      "function": "conditional",
+      "output": "error_result",
+      "params": {
+        "if": { "not": { "var": "is_success" } },
+        "then": {
+          "function": "custom_function",
+          "params": {
+            "name": "stg_error_handler",
+            "inputs": {
+              "response": { "var": "api_result.response" },
+              "status_code": { "var": "api_result.status_code" },
+              "operation": "get_job_lot"
+            }
+          }
+        },
+        "else": null
+      }
+    },
+    {
+      "id": "return_result",
+      "function": "return",
+      "params": {
+        "result": { "var": "api_result.response" },
+        "success": { "var": "is_success" },
+        "error": { "var": "error_result.error" }
+      }
+    }
+  ]
+}
