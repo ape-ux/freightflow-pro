@@ -1,114 +1,19 @@
-{
-  "name": "stg_get_hbl_by_station",
-  "description": "Retrieves CFS freight details with station code filtering",
-  "type": "custom_function",
-  "tags": ["stg-usa", "hbl", "ocean-import", "cfs", "station"],
-  "inputs": [
-    {
-      "name": "houseBillNumber",
-      "type": "text",
-      "description": "House Bill Number to search",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "House Bill Number is required"
-        }
-      ]
-    },
-    {
-      "name": "stationCode",
-      "type": "text",
-      "description": "Station code for filtering",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "Station code is required"
-        }
-      ]
-    }
-  ],
-  "outputs": [
-    {
-      "name": "result",
-      "type": "object",
-      "description": "CFS Details"
-    },
-    {
-      "name": "success",
-      "type": "boolean"
-    },
-    {
-      "name": "error",
-      "type": "object",
-      "nullable": true
-    }
-  ],
-  "function_stack": [
-    {
-      "id": "build_endpoint",
-      "function": "text_concat",
-      "output": "endpoint",
-      "params": {
-        "items": [
-          "/hblstationcode/",
-          { "var": "houseBillNumber" },
-          "/",
-          { "var": "stationCode" }
-        ]
-      }
-    },
-    {
-      "id": "call_stg_api",
-      "function": "custom_function",
-      "output": "api_result",
-      "params": {
-        "name": "stg_base_request",
-        "inputs": {
-          "endpoint": { "var": "endpoint" },
-          "method": "GET"
-        }
-      }
-    },
-    {
-      "id": "check_success",
-      "function": "conditional",
-      "output": "is_success",
-      "params": {
-        "if": { "var": "api_result.success" },
-        "then": true,
-        "else": false
-      }
-    },
-    {
-      "id": "handle_error",
-      "function": "conditional",
-      "output": "error_result",
-      "params": {
-        "if": { "not": { "var": "is_success" } },
-        "then": {
-          "function": "custom_function",
-          "params": {
-            "name": "stg_error_handler",
-            "inputs": {
-              "response": { "var": "api_result.response" },
-              "status_code": { "var": "api_result.status_code" },
-              "operation": "get_hbl_by_station"
-            }
-          }
-        },
-        "else": null
-      }
-    },
-    {
-      "id": "return_result",
-      "function": "return",
-      "params": {
-        "result": { "var": "api_result.response" },
-        "success": { "var": "is_success" },
-        "error": { "var": "error_result.error" }
-      }
-    }
-  ]
+// Retrieves CFS freight details with station code filtering
+query stg-usa/hbl/get_hbl_by_station verb=GET {
+  description = "Retrieves CFS freight details with station code filtering"
+
+  input {
+    text houseBillNumber
+    text stationCode
+  }
+
+  stack {
+    api.request {
+      url = $env.STG_API_BASE + "/hblstationcode/" + $input.houseBillNumber + "/" + $input.stationCode
+      method = "GET"
+      headers = []|array_push:"STG-VALIDATION-API-KEY: " + $env.STGVALIDATIONAPIKEY|array_push:"Accept: application/json"
+    } as $response
+  }
+
+  response = $response
 }

@@ -1,143 +1,20 @@
-{
-  "name": "stg_get_container",
-  "description": "Retrieves Ocean Import container and job details with lot information",
-  "type": "custom_function",
-  "tags": ["stg-usa", "container", "ocean-import"],
-  "inputs": [
-    {
-      "name": "containerNumber",
-      "type": "text",
-      "description": "Container number to search",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "Container number is required"
-        }
-      ]
-    },
-    {
-      "name": "custCode",
-      "type": "text",
-      "description": "Customer code (optional, uses default from env if not provided)",
-      "required": false
-    }
-  ],
-  "outputs": [
-    {
-      "name": "result",
-      "type": "object",
-      "description": "Container Details"
-    },
-    {
-      "name": "success",
-      "type": "boolean"
-    },
-    {
-      "name": "error",
-      "type": "object",
-      "nullable": true
-    }
-  ],
-  "function_stack": [
-    {
-      "id": "build_endpoint",
-      "function": "text_concat",
-      "comment": "Build the API endpoint path",
-      "output": "endpoint",
-      "params": {
-        "items": [
-          "/container/",
-          { "var": "containerNumber" }
-        ]
-      }
-    },
-    {
-      "id": "get_default_cust_code",
-      "function": "get_environment_variable",
-      "comment": "Get default customer code from environment",
-      "output": "default_cust_code",
-      "params": {
-        "name": "STG_CUSTOMER_CODE"
-      }
-    },
-    {
-      "id": "resolve_cust_code",
-      "function": "coalesce",
-      "comment": "Use provided custCode or fall back to default",
-      "output": "resolved_cust_code",
-      "params": {
-        "values": [
-          { "var": "custCode" },
-          { "var": "default_cust_code" }
-        ]
-      }
-    },
-    {
-      "id": "build_query_params",
-      "function": "create_object",
-      "comment": "Build query parameters",
-      "output": "query_params",
-      "params": {
-        "object": {
-          "custCode": { "var": "resolved_cust_code" }
-        }
-      }
-    },
-    {
-      "id": "call_stg_api",
-      "function": "custom_function",
-      "comment": "Call STG base request function",
-      "output": "api_result",
-      "params": {
-        "name": "stg_base_request",
-        "inputs": {
-          "endpoint": { "var": "endpoint" },
-          "method": "GET",
-          "query_params": { "var": "query_params" }
-        }
-      }
-    },
-    {
-      "id": "check_success",
-      "function": "conditional",
-      "output": "is_success",
-      "params": {
-        "if": { "var": "api_result.success" },
-        "then": true,
-        "else": false
-      }
-    },
-    {
-      "id": "handle_error",
-      "function": "conditional",
-      "output": "error_result",
-      "params": {
-        "if": {
-          "not": { "var": "is_success" }
-        },
-        "then": {
-          "function": "custom_function",
-          "params": {
-            "name": "stg_error_handler",
-            "inputs": {
-              "response": { "var": "api_result.response" },
-              "status_code": { "var": "api_result.status_code" },
-              "operation": "get_container"
-            }
-          }
-        },
-        "else": null
-      }
-    },
-    {
-      "id": "return_result",
-      "function": "return",
-      "params": {
-        "result": { "var": "api_result.response" },
-        "success": { "var": "is_success" },
-        "error": { "var": "error_result.error" }
-      }
-    }
-  ]
+// Retrieves Ocean Import container and job details with lot information
+query stg-usa/container/get_container verb=GET {
+  description = "Retrieves Ocean Import container and job details with lot information"
+
+  input {
+    text containerNumber
+    text custCode?
+  }
+
+  stack {
+    api.request {
+      url = $env.STG_API_BASE + "/container/" + $input.containerNumber
+      method = "GET"
+      params = {}|set:"custCode":($input.custCode ?? $env.STG_CUSTOMER_CODE)
+      headers = []|array_push:"STG-VALIDATION-API-KEY: " + $env.STGVALIDATIONAPIKEY|array_push:"Accept: application/json"
+    } as $response
+  }
+
+  response = $response
 }

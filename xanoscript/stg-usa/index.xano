@@ -1,194 +1,50 @@
-{
-  "name": "stg_usa_api_integration",
-  "description": "STG USA Validation API Integration - XanoScript Function Stacks for FreightFlow Pro",
-  "version": "1.0.0",
-  "api_documentation": "https://devstgn.stgusa.com/validation/v2/api-docs",
-  "environment_variables": {
-    "STGVALIDATIONAPIKEY": "STG Validation API Key for authentication",
-    "STG_API_BASE": "Base URL for STG API (e.g., https://devstgn.stgusa.com/validation/v2)",
-    "STG_CUSTOMER_CODE": "Default customer code for API requests"
-  },
-  "modules": {
-    "shared": {
-      "description": "Shared utilities and base functions",
-      "functions": [
-        {
-          "name": "stg_base_request",
-          "file": "shared/stg_base_request.xano",
-          "description": "Base HTTP request function with authentication"
-        },
-        {
-          "name": "stg_error_handler",
-          "file": "shared/stg_error_handler.xano",
-          "description": "Standardized error handling utility"
-        },
-        {
-          "name": "stg_get_env_property",
-          "file": "shared/get_env_property.xano",
-          "description": "Retrieve STG environment property values"
-        }
-      ]
-    },
-    "air": {
-      "description": "Air Imports endpoints",
-      "functions": [
-        {
-          "name": "stg_get_air_mbl",
-          "file": "air/get_air_mbl.xano",
-          "endpoint": "GET /air/mbl/{masterAirWayBillNumber}",
-          "description": "Get Air Imports Job details by Master Airway Bill Number"
-        }
-      ]
-    },
-    "container": {
-      "description": "Container Operations endpoints",
-      "functions": [
-        {
-          "name": "stg_get_container",
-          "file": "container/get_container.xano",
-          "endpoint": "GET /container/{containerNumber}",
-          "description": "Get Ocean Import container and job details"
-        },
-        {
-          "name": "stg_get_container_list",
-          "file": "container/get_container_list.xano",
-          "endpoint": "GET /containerList/{containerNumber}",
-          "description": "Get Ocean Import Containers List & Job level details"
-        },
-        {
-          "name": "stg_get_all_containers",
-          "file": "container/get_all_containers.xano",
-          "endpoint": "GET /allcontainers/{customerCode}",
-          "description": "Get all containers for a customer"
-        },
-        {
-          "name": "stg_get_all_containers_with_cfs",
-          "file": "container/get_all_containers_with_cfs.xano",
-          "endpoint": "GET /allcontainerswcfs/{customerCode}/{cfsCode}",
-          "description": "Get containers for a customer at specific CFS station"
-        }
-      ]
-    },
-    "hbl": {
-      "description": "House Bill of Lading endpoints",
-      "functions": [
-        {
-          "name": "stg_get_hbl",
-          "file": "hbl/get_hbl.xano",
-          "endpoint": "GET /hbl/{houseBillNumber}",
-          "description": "Get Ocean Imports CFS freight details via House Bill"
-        },
-        {
-          "name": "stg_get_hbl_list",
-          "file": "hbl/get_hbl_list.xano",
-          "endpoint": "GET /hblList/{houseBillNumber}",
-          "description": "Get list of Ocean Import CFS Details by House Bill"
-        },
-        {
-          "name": "stg_get_hbl_by_station",
-          "file": "hbl/get_hbl_by_station.xano",
-          "endpoint": "GET /hblstationcode/{houseBillNumber}/{stationCode}",
-          "description": "Get CFS freight details with station code filtering"
-        }
-      ]
-    },
-    "mbl": {
-      "description": "Master Bill of Lading endpoints",
-      "functions": [
-        {
-          "name": "stg_get_mbl",
-          "file": "mbl/get_mbl.xano",
-          "endpoint": "GET /mbl/{masterBillNumber}",
-          "description": "Get Ocean Import details via Master Bill"
-        },
-        {
-          "name": "stg_get_mbl_list",
-          "file": "mbl/get_mbl_list.xano",
-          "endpoint": "GET /mblList/{masterBillNumber}",
-          "description": "Get Ocean Import Containers List by Master Bill"
-        }
-      ]
-    },
-    "ams": {
-      "description": "AMS (Automated Manifest System) endpoints",
-      "functions": [
-        {
-          "name": "stg_get_ams",
-          "file": "ams/get_ams.xano",
-          "endpoint": "GET /ams/{amsHouseBillNumber}",
-          "description": "Get Ocean Import CFS freight via AMS House Bill"
-        },
-        {
-          "name": "stg_get_ams_list",
-          "file": "ams/get_ams_list.xano",
-          "endpoint": "GET /amsList/{amsHouseBillNumber}",
-          "description": "Get list of CFS freight details using AMS House Bill"
-        }
-      ]
-    },
-    "job": {
-      "description": "Job Reference endpoints",
-      "functions": [
-        {
-          "name": "stg_get_job_number",
-          "file": "job/get_job_number.xano",
-          "endpoint": "GET /jobNumber/{jobNumber}",
-          "description": "Get Ocean Import CFS Cargo details by Job Number"
-        },
-        {
-          "name": "stg_get_job_lot",
-          "file": "job/get_job_lot.xano",
-          "endpoint": "GET /joblot/{jobLotNumber}",
-          "description": "Get CFS cargo details by Job Lot identifier"
-        },
-        {
-          "name": "stg_get_job_lot_status",
-          "file": "job/get_job_lot_status.xano",
-          "endpoint": "GET /status/{jobLotNumber}",
-          "description": "Get status of a Job Lot Number"
-        }
-      ]
-    },
-    "references": {
-      "description": "Additional Reference endpoints",
-      "functions": [
-        {
-          "name": "stg_get_cust_ref_list",
-          "file": "references/get_cust_ref_list.xano",
-          "endpoint": "GET /custRefList/{customerRefNumber}",
-          "description": "Get list of CFS freight by customer reference number"
-        },
-        {
-          "name": "stg_get_it_number_list",
-          "file": "references/get_it_number_list.xano",
-          "endpoint": "GET /itNumberList/{itNumber}",
-          "description": "Get CFS freight details list by IT Number"
-        },
-        {
-          "name": "stg_get_load_number",
-          "file": "references/get_load_number.xano",
-          "endpoint": "GET /loadNumber/{loadNumber}",
-          "description": "Get IPI Tracking Details by Load Number"
-        }
-      ]
-    },
-    "stripping": {
-      "description": "Stripping Report endpoints",
-      "functions": [
-        {
-          "name": "stg_get_stripping_report",
-          "file": "stripping/get_stripping_report.xano",
-          "endpoint": "GET /strippingReport/{custCode}/{containerNumber}",
-          "description": "Get stripping report for a container"
-        },
-        {
-          "name": "stg_get_stripping_report_pdf",
-          "file": "stripping/get_stripping_report_pdf.xano",
-          "endpoint": "GET /strippingReportPdf/{custCode}/{containerNumber}",
-          "description": "Get stripping report as downloadable PDF"
-        }
-      ]
-    }
-  },
-  "total_functions": 20
-}
+// STG USA Validation API Integration - XanoScript Function Stacks for FreightFlow Pro
+// API Documentation: https://devstgn.stgusa.com/validation/v2/api-docs
+//
+// Environment Variables Required:
+//   - STGVALIDATIONAPIKEY: STG Validation API Key for authentication
+//   - STG_API_BASE: Base URL for STG API (e.g., https://devstgn.stgusa.com/validation/v2)
+//   - STG_CUSTOMER_CODE: Default customer code for API requests
+//
+// Available Endpoints:
+//
+// AIR IMPORTS
+//   - air/get_air_mbl.xano          GET /air/mbl/{masterAirWayBillNumber}
+//
+// CONTAINER OPERATIONS
+//   - container/get_container.xano              GET /container/{containerNumber}
+//   - container/get_container_list.xano         GET /containerList/{containerNumber}
+//   - container/get_all_containers.xano         GET /allcontainers/{customerCode}
+//   - container/get_all_containers_with_cfs.xano GET /allcontainerswcfs/{customerCode}/{cfsCode}
+//
+// HOUSE BILL OF LADING (HBL)
+//   - hbl/get_hbl.xano              GET /hbl/{houseBillNumber}
+//   - hbl/get_hbl_list.xano         GET /hblList/{houseBillNumber}
+//   - hbl/get_hbl_by_station.xano   GET /hblstationcode/{houseBillNumber}/{stationCode}
+//
+// MASTER BILL OF LADING (MBL)
+//   - mbl/get_mbl.xano              GET /mbl/{masterBillNumber}
+//   - mbl/get_mbl_list.xano         GET /mblList/{masterBillNumber}
+//
+// AMS (AUTOMATED MANIFEST SYSTEM)
+//   - ams/get_ams.xano              GET /ams/{amsHouseBillNumber}
+//   - ams/get_ams_list.xano         GET /amsList/{amsHouseBillNumber}
+//
+// JOB REFERENCES
+//   - job/get_job_number.xano       GET /jobNumber/{jobNumber}
+//   - job/get_job_lot.xano          GET /joblot/{jobLotNumber}
+//   - job/get_job_lot_status.xano   GET /status/{jobLotNumber}
+//
+// ADDITIONAL REFERENCES
+//   - references/get_cust_ref_list.xano   GET /custRefList/{customerRefNumber}
+//   - references/get_it_number_list.xano  GET /itNumberList/{itNumber}
+//   - references/get_load_number.xano     GET /loadNumber/{loadNumber}
+//
+// STRIPPING REPORTS
+//   - stripping/get_stripping_report.xano     GET /strippingReport/{custCode}/{containerNumber}
+//   - stripping/get_stripping_report_pdf.xano GET /strippingReportPdf/{custCode}/{containerNumber}
+//
+// CONFIGURATION
+//   - shared/get_env_property.xano  GET /getEnvPropValue/{property}
+//
+// Total Endpoints: 18

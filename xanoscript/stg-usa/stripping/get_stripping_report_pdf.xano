@@ -1,172 +1,19 @@
-{
-  "name": "stg_get_stripping_report_pdf",
-  "description": "Returns Stripping/Outturn report for a Container Number in a Downloadable PDF format",
-  "type": "custom_function",
-  "tags": ["stg-usa", "stripping", "container", "report", "pdf"],
-  "inputs": [
-    {
-      "name": "custCode",
-      "type": "text",
-      "description": "Customer code (optional, uses default from env if not provided)",
-      "required": false
-    },
-    {
-      "name": "containerNumber",
-      "type": "text",
-      "description": "Container Number",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "Container Number is required"
-        }
-      ]
-    }
-  ],
-  "outputs": [
-    {
-      "name": "result",
-      "type": "text",
-      "description": "PDF file content (byte string)"
-    },
-    {
-      "name": "content_type",
-      "type": "text",
-      "description": "Content type of the response"
-    },
-    {
-      "name": "success",
-      "type": "boolean"
-    },
-    {
-      "name": "error",
-      "type": "object",
-      "nullable": true
-    }
-  ],
-  "function_stack": [
-    {
-      "id": "get_default_cust_code",
-      "function": "get_environment_variable",
-      "output": "default_cust_code",
-      "params": {
-        "name": "STG_CUSTOMER_CODE"
-      }
-    },
-    {
-      "id": "resolve_cust_code",
-      "function": "coalesce",
-      "output": "resolved_cust_code",
-      "params": {
-        "values": [
-          { "var": "custCode" },
-          { "var": "default_cust_code" }
-        ]
-      }
-    },
-    {
-      "id": "build_endpoint",
-      "function": "text_concat",
-      "output": "endpoint",
-      "params": {
-        "items": [
-          "/strippingReportPdf/",
-          { "var": "resolved_cust_code" },
-          "/",
-          { "var": "containerNumber" }
-        ]
-      }
-    },
-    {
-      "id": "get_env_vars",
-      "function": "get_environment_variables",
-      "output": "env_config",
-      "params": {
-        "variables": [
-          "STGVALIDATIONAPIKEY",
-          "STG_API_BASE"
-        ]
-      }
-    },
-    {
-      "id": "build_url",
-      "function": "text_concat",
-      "output": "full_url",
-      "params": {
-        "items": [
-          { "var": "env_config.STG_API_BASE" },
-          { "var": "endpoint" }
-        ]
-      }
-    },
-    {
-      "id": "build_headers",
-      "function": "create_object",
-      "output": "headers",
-      "params": {
-        "object": {
-          "STG-VALIDATION-API-KEY": { "var": "env_config.STGVALIDATIONAPIKEY" },
-          "Accept": "application/pdf"
-        }
-      }
-    },
-    {
-      "id": "make_request",
-      "function": "external_api_request",
-      "comment": "Execute HTTP request for PDF download",
-      "output": "api_response",
-      "params": {
-        "url": { "var": "full_url" },
-        "method": "GET",
-        "headers": { "var": "headers" },
-        "timeout": 60000,
-        "response_type": "binary"
-      }
-    },
-    {
-      "id": "check_success",
-      "function": "conditional",
-      "output": "is_success",
-      "params": {
-        "if": {
-          "and": [
-            { "gte": [{ "var": "api_response.status" }, 200] },
-            { "lt": [{ "var": "api_response.status" }, 300] }
-          ]
-        },
-        "then": true,
-        "else": false
-      }
-    },
-    {
-      "id": "handle_error",
-      "function": "conditional",
-      "output": "error_result",
-      "params": {
-        "if": { "not": { "var": "is_success" } },
-        "then": {
-          "function": "custom_function",
-          "params": {
-            "name": "stg_error_handler",
-            "inputs": {
-              "response": { "var": "api_response.body" },
-              "status_code": { "var": "api_response.status" },
-              "operation": "get_stripping_report_pdf"
-            }
-          }
-        },
-        "else": null
-      }
-    },
-    {
-      "id": "return_result",
-      "function": "return",
-      "params": {
-        "result": { "var": "api_response.body" },
-        "content_type": "application/pdf",
-        "success": { "var": "is_success" },
-        "error": { "var": "error_result.error" }
-      }
-    }
-  ]
+// Returns Stripping/Outturn report for a Container Number in a Downloadable PDF format
+query stg-usa/stripping/get_stripping_report_pdf verb=GET {
+  description = "Returns Stripping/Outturn report for a Container Number in a Downloadable PDF format"
+
+  input {
+    text custCode?
+    text containerNumber
+  }
+
+  stack {
+    api.request {
+      url = $env.STG_API_BASE + "/strippingReportPdf/" + ($input.custCode ?? $env.STG_CUSTOMER_CODE) + "/" + $input.containerNumber
+      method = "GET"
+      headers = []|array_push:"STG-VALIDATION-API-KEY: " + $env.STGVALIDATIONAPIKEY|array_push:"Accept: application/pdf"
+    } as $response
+  }
+
+  response = $response
 }
