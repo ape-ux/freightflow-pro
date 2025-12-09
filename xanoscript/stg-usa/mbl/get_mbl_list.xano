@@ -1,100 +1,18 @@
-{
-  "name": "stg_get_mbl_list",
-  "description": "Returns Ocean Import Containers List and Job level details",
-  "type": "custom_function",
-  "tags": ["stg-usa", "mbl", "ocean-import", "list"],
-  "inputs": [
-    {
-      "name": "masterBillNumber",
-      "type": "text",
-      "description": "Master Bill Number to search",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "Master Bill Number is required"
-        }
-      ]
-    }
-  ],
-  "outputs": [
-    {
-      "name": "result",
-      "type": "array",
-      "description": "Array of Container Details"
-    },
-    {
-      "name": "success",
-      "type": "boolean"
-    },
-    {
-      "name": "error",
-      "type": "object",
-      "nullable": true
-    }
-  ],
-  "function_stack": [
-    {
-      "id": "build_endpoint",
-      "function": "text_concat",
-      "output": "endpoint",
-      "params": {
-        "items": [
-          "/mblList/",
-          { "var": "masterBillNumber" }
-        ]
-      }
-    },
-    {
-      "id": "call_stg_api",
-      "function": "custom_function",
-      "output": "api_result",
-      "params": {
-        "name": "stg_base_request",
-        "inputs": {
-          "endpoint": { "var": "endpoint" },
-          "method": "GET"
-        }
-      }
-    },
-    {
-      "id": "check_success",
-      "function": "conditional",
-      "output": "is_success",
-      "params": {
-        "if": { "var": "api_result.success" },
-        "then": true,
-        "else": false
-      }
-    },
-    {
-      "id": "handle_error",
-      "function": "conditional",
-      "output": "error_result",
-      "params": {
-        "if": { "not": { "var": "is_success" } },
-        "then": {
-          "function": "custom_function",
-          "params": {
-            "name": "stg_error_handler",
-            "inputs": {
-              "response": { "var": "api_result.response" },
-              "status_code": { "var": "api_result.status_code" },
-              "operation": "get_mbl_list"
-            }
-          }
-        },
-        "else": null
-      }
-    },
-    {
-      "id": "return_result",
-      "function": "return",
-      "params": {
-        "result": { "var": "api_result.response" },
-        "success": { "var": "is_success" },
-        "error": { "var": "error_result.error" }
-      }
-    }
-  ]
+// Returns Ocean Import Containers List and Job level details
+query stg-usa/mbl/get_mbl_list verb=GET {
+  description = "Returns Ocean Import Containers List and Job level details"
+
+  input {
+    text masterBillNumber
+  }
+
+  stack {
+    api.request {
+      url = $env.STG_API_BASE + "/mblList/" + $input.masterBillNumber
+      method = "GET"
+      headers = []|array_push:"STG-VALIDATION-API-KEY: " + $env.STGVALIDATIONAPIKEY|array_push:"Accept: application/json"
+    } as $response
+  }
+
+  response = $response
 }

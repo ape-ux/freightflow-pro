@@ -1,100 +1,18 @@
-{
-  "name": "stg_get_cust_ref_list",
-  "description": "Retrieves list of CFS freight using customer reference number",
-  "type": "custom_function",
-  "tags": ["stg-usa", "reference", "customer", "cfs", "list"],
-  "inputs": [
-    {
-      "name": "customerRefNumber",
-      "type": "text",
-      "description": "Customer Reference Number to search",
-      "required": true,
-      "validators": [
-        {
-          "type": "not_empty",
-          "message": "Customer Reference Number is required"
-        }
-      ]
-    }
-  ],
-  "outputs": [
-    {
-      "name": "result",
-      "type": "array",
-      "description": "Array of CFS Details"
-    },
-    {
-      "name": "success",
-      "type": "boolean"
-    },
-    {
-      "name": "error",
-      "type": "object",
-      "nullable": true
-    }
-  ],
-  "function_stack": [
-    {
-      "id": "build_endpoint",
-      "function": "text_concat",
-      "output": "endpoint",
-      "params": {
-        "items": [
-          "/custRefList/",
-          { "var": "customerRefNumber" }
-        ]
-      }
-    },
-    {
-      "id": "call_stg_api",
-      "function": "custom_function",
-      "output": "api_result",
-      "params": {
-        "name": "stg_base_request",
-        "inputs": {
-          "endpoint": { "var": "endpoint" },
-          "method": "GET"
-        }
-      }
-    },
-    {
-      "id": "check_success",
-      "function": "conditional",
-      "output": "is_success",
-      "params": {
-        "if": { "var": "api_result.success" },
-        "then": true,
-        "else": false
-      }
-    },
-    {
-      "id": "handle_error",
-      "function": "conditional",
-      "output": "error_result",
-      "params": {
-        "if": { "not": { "var": "is_success" } },
-        "then": {
-          "function": "custom_function",
-          "params": {
-            "name": "stg_error_handler",
-            "inputs": {
-              "response": { "var": "api_result.response" },
-              "status_code": { "var": "api_result.status_code" },
-              "operation": "get_cust_ref_list"
-            }
-          }
-        },
-        "else": null
-      }
-    },
-    {
-      "id": "return_result",
-      "function": "return",
-      "params": {
-        "result": { "var": "api_result.response" },
-        "success": { "var": "is_success" },
-        "error": { "var": "error_result.error" }
-      }
-    }
-  ]
+// Retrieves list of CFS freight using customer reference number
+query stg-usa/references/get_cust_ref_list verb=GET {
+  description = "Retrieves list of CFS freight using customer reference number"
+
+  input {
+    text customerRefNumber
+  }
+
+  stack {
+    api.request {
+      url = $env.STG_API_BASE + "/custRefList/" + $input.customerRefNumber
+      method = "GET"
+      headers = []|array_push:"STG-VALIDATION-API-KEY: " + $env.STGVALIDATIONAPIKEY|array_push:"Accept: application/json"
+    } as $response
+  }
+
+  response = $response
 }
